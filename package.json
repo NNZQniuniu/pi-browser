@@ -1,0 +1,22 @@
+{
+	"name": "pi-browser",
+	"private": true,
+	"version": "0.1.0",
+	"type": "module",
+	"description": "pi agent running entirely in the browser",
+	"scripts": {
+		"dev": "vite",
+		"build": "tsc --noEmit && vite build",
+		"preview": "vite preview"
+	},
+	"dependencies": {
+		"@earendil-works/pi-agent-core": "0.82.0",
+		"@earendil-works/pi-ai": "0.82.0",
+		"dompurify": "^3.2.6",
+		"marked": "^16.0.0"
+	},
+	"devDependencies": {
+		"typescript": "^5.8.3",
+		"vite": "^7.0.0"
+	}
+}
