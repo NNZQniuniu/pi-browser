@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<title>π browser — 浏览器里的 pi agent</title>
+	<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%237c6cf0'/%3E%3Ctext x='32' y='45' font-size='40' text-anchor='middle' fill='white' font-family='Georgia,serif'%3E%CF%80%3C/text%3E%3C/svg%3E" />
+	<style>
+		.model-row {
+			display: flex;
+			gap: 8px;
+			align-items: stretch;
+		}
+
+		.model-row input {
+			flex: 1;
+			background: var(--bg);
+			border: 1px solid var(--border);
+			color: var(--text);
+			border-radius: var(--radius-sm);
+			padding: 9px 12px;
+			font-size: 14px;
+			font-family: var(--font);
+			outline: none;
+			min-width: 0;
+		}
+
+		.model-row input:focus {
+			border-color: var(--accent);
+		}
+
+		.model-row .icon-btn {
+			border: 1px solid var(--border);
+			background: var(--bg);
+			width: 38px;
+			flex: none;
+		}
+
+		.model-row .icon-btn:disabled {
+			opacity: 0.4;
+			cursor: default;
+		}
+
+		.model-row .icon-btn.spinning {
+			animation: spin 0.8s linear infinite;
+		}
+
+		.advanced {
+			margin-bottom: 14px;
+		}
+
+		.advanced summary {
+			cursor: pointer;
+			color: var(--text-dim);
+			font-size: 13px;
+			user-select: none;
+			padding: 4px 0;
+		}
+
+		.advanced summary:hover {
+			color: var(--text);
+		}
+
+		.advanced .field {
+			margin-top: 12px;
+		}
+	</style>
+  <script type="module" crossorigin src="./assets/index-CP8KzBJy.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-D6LYBris.css">
+</head>
+<body>
+	<div id="app">
+		<header class="topbar">
+			<div class="brand">
+				<span class="logo">π</span>
+				<span class="brand-name">pi-browser</span>
+				<span class="brand-tag">agent, entirely in your browser</span>
+			</div>
+			<div class="topbar-right">
+				<span id="model-badge" class="model-badge" title="当前模型">未配置</span>
+				<button id="btn-settings" class="icon-btn" title="设置" aria-label="设置">
+					<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+				</button>
+			</div>
+		</header>
+
+		<main id="chat" class="chat">
+			<div id="welcome" class="welcome">
+				<div class="welcome-logo">π</div>
+				<h1>pi-browser</h1>
+				<p class="welcome-sub">一个完全跑在浏览器里的 agent:上传文件、浏览网页、产出文档——没有后端,没有本地依赖。</p>
+				<div class="suggestions">
+					<button class="suggestion" data-prompt="帮我总结 /uploads 里的文件,把要点整理成 markdown 写到 /output/summary.md">总结上传的文件</button>
+					<button class="suggestion" data-prompt="用 browse_url 抓取 https://en.wikipedia.org/wiki/Agent_(AI),写一份 300 字中文摘要">抓取网页摘要</button>
+					<button class="suggestion" data-prompt="自我介绍:你能用什么工具,能做什么、不能做什么?">这个 agent 能做什么</button>
+				</div>
+			</div>
+			<div id="messages" class="messages"></div>
+		</main>
+
+		<footer class="composer-wrap">
+			<div class="composer">
+				<div id="attachments" class="attachments"></div>
+				<div class="composer-row">
+					<button id="btn-attach" class="icon-btn" title="上传文件" aria-label="上传文件">
+						<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+					</button>
+					<textarea id="input" rows="1" placeholder="给 agent 下指令…(Enter 发送,Shift+Enter 换行)"></textarea>
+					<button id="btn-stop" class="icon-btn stop hidden" title="停止" aria-label="停止">■</button>
+					<button id="btn-send" class="send-btn" title="发送" aria-label="发送" disabled>
+						<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+					</button>
+				</div>
+				<input id="file-input" type="file" multiple hidden />
+			</div>
+			<p class="footnote">纯前端运行 · API key 只存在本机浏览器 · 网页抓取经 r.jina.ai 转换 · 刷新后会话即丢失</p>
+		</footer>
+
+		<div id="settings-overlay" class="overlay hidden">
+			<div class="settings" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+				<div class="settings-head">
+					<h2 id="settings-title">设置</h2>
+					<button id="btn-settings-close" class="icon-btn" aria-label="关闭">✕</button>
+				</div>
+				<label class="field">
+					<span>Provider</span>
+					<select id="sel-provider">
+						<option value="anthropic">Anthropic (Claude)</option>
+						<option value="openai">OpenAI</option>
+						<option value="google">Google Gemini</option>
+						<option value="deepseek">DeepSeek</option>
+						<option value="custom">自定义(任意端点)</option>
+					</select>
+				</label>
+				<div id="custom-fields" class="hidden">
+					<label class="field">
+						<span>API 协议</span>
+						<select id="sel-custom-api">
+							<option value="openai-completions">OpenAI 兼容(/chat/completions)</option>
+							<option value="anthropic-messages">Anthropic 兼容(/v1/messages)</option>
+							<option value="google-generative-ai">Google Gemini API</option>
+							<option value="openai-responses">OpenAI Responses(/v1/responses)</option>
+						</select>
+					</label>
+					<label class="field">
+						<span>Base URL(按协议官方格式:OpenAI 兼容可含 /v1;Anthropic 兼容不包含 /v1)</span>
+						<input id="inp-custom-base" type="text" placeholder="https://api.example.com" autocomplete="off" spellcheck="false" />
+					</label>
+				</div>
+				<label class="field">
+					<span>模型</span>
+					<div class="model-row">
+						<input id="inp-model" list="model-options" placeholder="从下拉选择或直接输入模型 ID" autocomplete="off" spellcheck="false" />
+						<datalist id="model-options"></datalist>
+						<button id="btn-refresh-models" class="icon-btn" title="从上游 API 拉取真实模型列表(需要先填 API Key)">↻</button>
+					</div>
+				</label>
+				<label class="field">
+					<span>API Key</span>
+					<input id="inp-key" type="password" placeholder="粘贴该 provider 的 API key" autocomplete="off" spellcheck="false" />
+				</label>
+				<details class="advanced">
+					<summary>高级设置</summary>
+					<label class="field">
+						<span>网页抓取代理(可选)</span>
+						<input id="inp-proxy" type="text" placeholder="https://r.jina.ai" autocomplete="off" spellcheck="false" />
+					</label>
+				</details>
+				<p class="hint">Key 只写入本机 localStorage,请求直连模型服务商;除此之外不经过任何服务器。抓取代理需支持 CORS 且在你的网络可达,r.jina.ai 在国际网络可用,国内网络建议自建(如 Cloudflare Worker)。</p>
+				<button id="btn-save" class="primary-btn">保存并应用</button>
+			</div>
+		</div>
+	</div>
+</body>
+</html>
