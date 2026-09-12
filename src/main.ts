@@ -27,6 +27,7 @@ import {
 } from "@earendil-works/pi-agent-core";
 
 import { BrowserExecutionEnv } from "./browser-env";
+import { canvasImageProcessor } from "./images";
 import { fetchUpstreamModels } from "./model-list";
 import { browseUrlTool, setBrowseProxy } from "./tools";
 import { Ui } from "./ui";
@@ -44,7 +45,7 @@ const STORAGE_KEY = "pi-browser:settings";
 
 const SYSTEM_PROMPT = `You are pi, an agent running entirely inside the user's web browser. There is no shell and no access to the user's local machine.
 
-- Files the user uploads are placed under /uploads/. Inspect them with the read tool.
+- Files the user uploads are placed under /uploads/. Inspect them with the read tool. Images attached to the user's message are visible directly (if the current model supports vision) and are also saved under /uploads/ for re-reading.
 - Anything produced for the user to keep must be written under /output/ as a markdown file with the write tool (the UI shows a download button for each file there). Prefer one self-contained document per task, e.g. /output/report.md.
 - Use browse_url to fetch web pages; it returns page content as markdown.
 - If a tool call fails, tell the user plainly instead of retrying silently.
@@ -106,7 +107,7 @@ let models: MutableModels = createModels({ credentials });
 let session: Session | null = null;
 let harness: AgentHarness<ExecutionToolContext> | null = null;
 let settings = loadSettings();
-let pendingUploads: { path: string; name: string; size: number }[] = [];
+let pendingUploads: { path: string; name: string; size: number; mimeType: string }[] = [];
 let shownDocs = new Set<string>();
 let liveModelIds = new Set<string>();
 let busy = false;
@@ -199,7 +200,7 @@ async function ensureHarness(): Promise<AgentHarness<ExecutionToolContext>> {
 		session,
 		models,
 		model: resolveModel(),
-		tools: [createReadTool(), createWriteTool(), browseUrlTool],
+		tools: [createReadTool({ imageProcessor: canvasImageProcessor }), createWriteTool(), browseUrlTool],
 		toolContext: { env },
 		systemPrompt: SYSTEM_PROMPT,
 	});
@@ -278,12 +279,30 @@ async function onFilesPicked(list: FileList): Promise<void> {
 		const path = await uniquePath(`/uploads/${file.name}`);
 		const result = await env.writeFile(path, bytes);
 		if (result.ok) {
-			pendingUploads.push({ path, name: file.name, size: bytes.length });
+			pendingUploads.push({ path, name: file.name, size: bytes.length, mimeType: file.type || "application/octet-stream" });
 			ui.addAttachmentChip(file.name);
 		} else {
 			ui.showError(`上传失败 ${file.name}:${result.error.message}`);
 		}
 	}
+}
+
+async function buildPromptImages(files: { path: string; mimeType: string }[]): Promise<
+	{ type: "image"; data: string; mimeType: string }[]
+> {
+	const images: { type: "image"; data: string; mimeType: string }[] = [];
+	for (const file of files) {
+		if (!file.mimeType.startsWith("image/")) continue;
+		const bytes = await env.readBinaryFile(file.path);
+		if (!bytes.ok) continue;
+		let binary = "";
+		const chunkSize = 0x8000;
+		for (let i = 0; i < bytes.value.length; i += chunkSize) {
+			binary += String.fromCharCode(...bytes.value.subarray(i, i + chunkSize));
+		}
+		images.push({ type: "image", data: btoa(binary), mimeType: file.mimeType });
+	}
+	return images;
 }
 
 async function onSend(): Promise<void> {
@@ -292,10 +311,12 @@ async function onSend(): Promise<void> {
 	const files = pendingUploads;
 	if (!text && files.length === 0) return;
 
+	const imageFiles = files.filter((f) => f.mimeType.startsWith("image/"));
 	const prompt =
-		(text || "请阅读刚上传的文件并概述内容。") +
+		(text || (files.length ? "请阅读刚上传的文件并概述内容。" : "")) +
 		(files.length
-			? `\n\n[System note] Newly uploaded files: ${files.map((f) => f.path).join(", ")}.`
+			? `\n\n[System note] Newly uploaded files: ${files.map((f) => f.path).join(", ")}.` +
+				(imageFiles.length ? " Attached images are included in this message; you can also re-read them from disk with the read tool." : "")
 			: "");
 	pendingUploads = [];
 	ui.clearAttachments();
@@ -305,7 +326,8 @@ async function onSend(): Promise<void> {
 	ui.setBusy(true);
 	try {
 		const agent = await ensureHarness();
-		await agent.prompt(prompt);
+		const images = await buildPromptImages(imageFiles);
+		await agent.prompt(prompt, images.length ? { images } : undefined);
 	} catch (e) {
 		ui.showError(e instanceof Error ? e.message : String(e));
 	} finally {
